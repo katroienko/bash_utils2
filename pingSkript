@@ -1,0 +1,44 @@
+#!/bin/bash
+
+# Запрос адреса для пинга у пользователя
+read -p "Введите адрес для пинга: " target
+
+# Переменные
+threshold=100  # Порог времени пинга в мс
+failure_count=0  # Счетчик неудачных попыток
+max_failures=3  # Максимальное количество неудачных попыток до вывода сообщения
+
+# Бесконечный цикл
+while true; do
+    # Выполняем пинг и извлекаем время ответа
+    ping_result=$(ping -c 1 -W 1 $target 2>/dev/null | grep 'time=')
+    
+    if [[ -n $ping_result ]]; then
+        # Извлекаем время ответа в миллисекундах
+        ping_time=$(echo $ping_result | grep -oP 'time=\K[0-9.]+')
+
+        # Проверяем, превышает ли время пинга порог
+        if (( $(echo "$ping_time > $threshold" | bc -l) )); then
+            echo "Время пинга $ping_time мс превышает пороговое значение $threshold мс"
+        else
+            echo "Пинг успешен, время: $ping_time мс"
+        fi
+
+        # Сбрасываем счетчик неудачных попыток
+        failure_count=0
+    else
+        # Увеличиваем счетчик неудачных попыток
+        ((failure_count++))
+        echo "Пинг неудачен ($failure_count/$max_failures)"
+    fi
+
+    # Проверяем, достигли ли максимального количества неудач
+    if [[ $failure_count -ge $max_failures ]]; then
+        echo "Пинг не удался $max_failures раза подряд. Завершение проверки."
+        exit 1
+    fi
+
+    # Интервал между попытками
+    sleep 1
+done
+
